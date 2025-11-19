@@ -2,7 +2,8 @@
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
-  <title>Camcookie Santa Tracker</title>
+  <title>Camcookie Santa Tracker - Present Catch</title>
+    <link rel="icon" href="https://camcookieg.github.io/CST/CST_LOGO.png" type="image/png">
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
     body {
@@ -30,11 +31,11 @@
     #logo {
       width: 220px;
       height: 220px;
-      background: url('https://camcookie876.github.io/CST/IMG/CST_LOGO.png') no-repeat center center;
+      background: url('https://camcookieg.github.io/CST/IMG/CST_LOGO.png') no-repeat center center;
       background-size: contain;
     }
 
-    /* Navigation buttons (top left) */
+    /* Navigation (top left) */
     .nav {
       position: fixed;
       top: 20px;
@@ -84,6 +85,71 @@
       height: 100%;
       border: none;
     }
+
+    /* Pause overlay (full-screen red like splash) */
+    #pauseOverlay {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: #FF4136;
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 15;
+      opacity: 0;
+      transition: opacity 0.4s ease;
+    }
+    #pauseOverlay.visible {
+      display: flex;
+      opacity: 1;
+    }
+    #pausePanel {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 16px;
+      text-align: center;
+      color: #fff;
+    }
+    #pauseLogo {
+      width: 180px;
+      height: 180px;
+      background: url('https://camcookieg.github.io/CST/IMG/CST_LOGO.png') no-repeat center center;
+      background-size: contain;
+      filter: drop-shadow(0 0 6px rgba(0,0,0,0.3));
+    }
+    #pauseTitle {
+      font-size: 2rem;
+      font-weight: 800;
+      letter-spacing: 0.5px;
+    }
+    #pauseControls {
+      display: flex;
+      gap: 12px;
+    }
+    #pauseControls button {
+      background: rgba(255,255,255,0.2);
+      border: none;
+      color: #fff;
+      padding: 10px 16px;
+      border-radius: 10px;
+      cursor: pointer;
+      backdrop-filter: blur(4px);
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 600;
+    }
+    #pauseControls button.primary {
+      background: #FFDC00;
+      color: #001f3f;
+    }
+    #pauseControls svg { width: 22px; height: 22px; fill: currentColor; }
+    #pauseHint { opacity: 0.8; font-size: 0.9rem; }
+
+    /* Dim and block game when paused */
+    #game.paused iframe { filter: grayscale(40%) brightness(0.6); }
+    #game.paused { pointer-events: none; }
   </style>
 </head>
 <body>
@@ -99,6 +165,11 @@
     <button id="muteBtn" title="Mute/Unmute">
       <svg id="muteIcon" viewBox="0 0 24 24"><path d="M4 9v6h4l5 5V4l-5 5H4z"/></svg>
     </button>
+    <button id="pauseBtn" title="Pause">
+      <svg id="pauseIcon" viewBox="0 0 24 24">
+        <path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>
+      </svg>
+    </button>
   </div>
 
   <!-- Countdown -->
@@ -107,6 +178,24 @@
   <!-- Game iframe -->
   <div id="game">
     <iframe id="gameFrame" src="https://camcookieg.github.io/game/gamecode/1/w/" allow="autoplay"></iframe>
+  </div>
+
+  <!-- Pause overlay -->
+  <div id="pauseOverlay" aria-hidden="true">
+    <div id="pausePanel">
+      <div id="pauseLogo"></div>
+      <div id="pauseTitle">Paused</div>
+      <div id="pauseControls">
+        <button id="resumeBtn" class="primary">Resume game</button>
+        <button id="musicToggleBtn">
+          <svg id="musicToggleIcon" viewBox="0 0 24 24">
+            <path d="M9 18V5l12-2v9h-2V6.27l-8 1.33V18a3 3 0 11-2-2.83z"/>
+          </svg>
+          <span id="musicToggleLabel">Pause music</span>
+        </button>
+      </div>
+      <div id="pauseHint">Press Space to resume</div>
+    </div>
   </div>
 
   <!-- Music player (hidden) -->
@@ -121,6 +210,13 @@
     const gameFrame = document.getElementById("gameFrame");
     const countdownEl = document.getElementById("countdown");
     const musicPlayer = document.getElementById("musicPlayer");
+
+    const pauseBtn = document.getElementById("pauseBtn");
+    const pauseOverlay = document.getElementById("pauseOverlay");
+    const resumeBtn = document.getElementById("resumeBtn");
+    const musicToggleBtn = document.getElementById("musicToggleBtn");
+    const musicToggleIcon = document.getElementById("musicToggleIcon");
+    const musicToggleLabel = document.getElementById("musicToggleLabel");
 
     // Playlist
     const playlist = [
@@ -153,7 +249,7 @@
       localStorage.setItem("camcookieTrack", currentTrack);
       musicPlayer.src = playlist[currentTrack];
       musicPlayer.currentTime = 0;
-      musicPlayer.play();
+      musicPlayer.play().catch(()=>{});
     });
 
     // Fade in game after splash
@@ -166,18 +262,18 @@
     };
 
     // Mute toggle
+    let isMutedState = isMuted;
     muteBtn.onclick = () => {
-      isMuted = !isMuted;
-      localStorage.setItem("camcookieMuted", isMuted);
+      isMutedState = !isMutedState;
+      localStorage.setItem("camcookieMuted", isMutedState);
       updateMute();
     };
-
     function updateMute() {
-      muteIcon.innerHTML = isMuted
+      muteIcon.innerHTML = isMutedState
         ? '<path d="M16.5 12l3.5 3.5-1.5 1.5L15 13.5l-3.5 3.5-1.5-1.5L13.5 12 10 8.5l1.5-1.5L15 10.5l3.5-3.5 1.5 1.5L16.5 12z"/>'
         : '<path d="M4 9v6h4l5 5V4l-5 5H4z"/>';
-      musicPlayer.muted = isMuted;
-      gameFrame.muted = isMuted;
+      musicPlayer.muted = isMutedState;
+      // Note: iframe audio cannot be controlled cross-origin; this only affects the musicPlayer
     }
     updateMute();
 
@@ -209,6 +305,72 @@
     }
     setInterval(updateCountdown, 1000);
     updateCountdown();
+
+    // Pause/resume logic
+    let isPaused = false;
+
+    function pauseGame() {
+      if (isPaused) return;
+      isPaused = true;
+      document.getElementById("game").classList.add("paused");
+      pauseOverlay.classList.add("visible");
+      pauseOverlay.setAttribute("aria-hidden", "false");
+
+      // Notify iframe (if it listens)
+      try {
+        gameFrame.contentWindow.postMessage({ type: "CST_PAUSE" }, "*");
+      } catch {}
+    }
+
+    function resumeGame() {
+      if (!isPaused) return;
+      isPaused = false;
+      document.getElementById("game").classList.remove("paused");
+      pauseOverlay.classList.remove("visible");
+      pauseOverlay.setAttribute("aria-hidden", "true");
+
+      try {
+        gameFrame.contentWindow.postMessage({ type: "CST_RESUME" }, "*");
+      } catch {}
+    }
+
+    pauseBtn.onclick = pauseGame;
+    resumeBtn.onclick = resumeGame;
+
+    // Keyboard shortcuts
+    window.addEventListener("keydown", (e) => {
+      if (e.code === "Space") {
+        e.preventDefault();
+        isPaused ? resumeGame() : pauseGame();
+      } else if (e.code === "Escape" && isPaused) {
+        resumeGame();
+      }
+    });
+
+    // Music play/pause in overlay
+    function updateMusicToggleVisual() {
+      const isPlaying = !musicPlayer.paused;
+      if (isPlaying) {
+        musicToggleIcon.innerHTML = '<path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"/>';
+        musicToggleLabel.textContent = "Pause music";
+      } else {
+        musicToggleIcon.innerHTML = '<path d="M8 5v14l11-7z"/>';
+        musicToggleLabel.textContent = "Play music";
+      }
+    }
+
+    musicToggleBtn.onclick = () => {
+      if (musicPlayer.paused) {
+        musicPlayer.play().catch(()=>{});
+      } else {
+        musicPlayer.pause();
+      }
+      updateMusicToggleVisual();
+    };
+
+    musicPlayer.addEventListener("play", updateMusicToggleVisual);
+    musicPlayer.addEventListener("pause", updateMusicToggleVisual);
+    updateMusicToggleVisual();
   </script>
 </body>
 </html>
