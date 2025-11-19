@@ -1,0 +1,214 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Camcookie Santa Tracker</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    body {
+      margin: 0;
+      font-family: 'Segoe UI', sans-serif;
+      background: #001f3f;
+      overflow: hidden;
+    }
+
+    /* Splash screen */
+    #splash {
+      position: fixed;
+      top: 0; left: 0;
+      width: 100%; height: 100%;
+      background: #FF4136;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      z-index: 10;
+      opacity: 1;
+      transition: opacity 1s ease;
+    }
+    #splash.fade-out { opacity: 0; pointer-events: none; }
+
+    #logo {
+      width: 220px;
+      height: 220px;
+      background: url('https://camcookie876.github.io/CST/IMG/CST_LOGO.png') no-repeat center center;
+      background-size: contain;
+    }
+
+    /* Navigation buttons (top left) */
+    .nav {
+      position: fixed;
+      top: 20px;
+      left: 20px;
+      z-index: 5;
+      display: flex;
+      gap: 12px;
+      opacity: 0;
+      transition: opacity 1s ease;
+    }
+    .nav.visible { opacity: 1; }
+
+    .nav button {
+      background: rgba(255,255,255,0.2);
+      border: none;
+      padding: 10px;
+      border-radius: 50%;
+      cursor: pointer;
+      backdrop-filter: blur(5px);
+    }
+    .nav svg { width: 24px; height: 24px; fill: #FFDC00; }
+
+    /* Countdown (top right) */
+    #countdown {
+      position: fixed;
+      top: 20px;
+      right: 20px;
+      z-index: 5;
+      background: #FF4136;
+      color: white;
+      padding: 10px 20px;
+      border-radius: 8px;
+      font-size: 1.2rem;
+      font-weight: bold;
+      opacity: 0;
+      transition: opacity 1s ease;
+    }
+    #countdown.visible { opacity: 1; }
+
+    /* Game area */
+    #game {
+      width: 100vw;
+      height: 100vh;
+    }
+    iframe {
+      width: 100%;
+      height: 100%;
+      border: none;
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Splash screen -->
+  <div id="splash"><div id="logo"></div></div>
+
+  <!-- Navigation -->
+  <div class="nav" id="nav">
+    <button id="homeBtn" title="Home">
+      <svg viewBox="0 0 24 24"><path d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/></svg>
+    </button>
+    <button id="muteBtn" title="Mute/Unmute">
+      <svg id="muteIcon" viewBox="0 0 24 24"><path d="M4 9v6h4l5 5V4l-5 5H4z"/></svg>
+    </button>
+  </div>
+
+  <!-- Countdown -->
+  <div id="countdown"></div>
+
+  <!-- Game iframe -->
+  <div id="game">
+    <iframe id="gameFrame" src="https://camcookieg.github.io/game/gamecode/1/w/" allow="autoplay"></iframe>
+  </div>
+
+  <!-- Music player (hidden) -->
+  <audio id="musicPlayer" preload="auto"></audio>
+
+  <script>
+    const splash = document.getElementById("splash");
+    const nav = document.getElementById("nav");
+    const homeBtn = document.getElementById("homeBtn");
+    const muteBtn = document.getElementById("muteBtn");
+    const muteIcon = document.getElementById("muteIcon");
+    const gameFrame = document.getElementById("gameFrame");
+    const countdownEl = document.getElementById("countdown");
+    const musicPlayer = document.getElementById("musicPlayer");
+
+    // Playlist
+    const playlist = [
+      "https://camcookieg.github.io/CST/music/AI-Music-so-1.mp3",
+      "https://camcookieg.github.io/CST/music/AI-Music-so-2.mp3",
+      "https://camcookieg.github.io/CST/music/Brev-AI-1.mp3",
+      "https://camcookieg.github.io/CST/music/Brev-AI-2.mp3"
+    ];
+
+    // Restore state
+    let currentTrack = parseInt(localStorage.getItem("camcookieTrack") || "0");
+    let currentTime = parseFloat(localStorage.getItem("camcookieTime") || "0");
+    let isMuted = localStorage.getItem("camcookieMuted") === "true";
+
+    // Setup player
+    musicPlayer.src = playlist[currentTrack];
+    musicPlayer.currentTime = currentTime;
+    musicPlayer.muted = isMuted;
+    musicPlayer.play().catch(()=>{});
+
+    // Save progress
+    setInterval(() => {
+      localStorage.setItem("camcookieTrack", currentTrack);
+      localStorage.setItem("camcookieTime", musicPlayer.currentTime);
+    }, 2000);
+
+    // Track ended → next track
+    musicPlayer.addEventListener("ended", () => {
+      currentTrack = (currentTrack + 1) % playlist.length;
+      localStorage.setItem("camcookieTrack", currentTrack);
+      musicPlayer.src = playlist[currentTrack];
+      musicPlayer.currentTime = 0;
+      musicPlayer.play();
+    });
+
+    // Fade in game after splash
+    window.onload = () => {
+      setTimeout(() => {
+        splash.classList.add("fade-out");
+        nav.classList.add("visible");
+        countdownEl.classList.add("visible");
+      }, 1500);
+    };
+
+    // Mute toggle
+    muteBtn.onclick = () => {
+      isMuted = !isMuted;
+      localStorage.setItem("camcookieMuted", isMuted);
+      updateMute();
+    };
+
+    function updateMute() {
+      muteIcon.innerHTML = isMuted
+        ? '<path d="M16.5 12l3.5 3.5-1.5 1.5L15 13.5l-3.5 3.5-1.5-1.5L13.5 12 10 8.5l1.5-1.5L15 10.5l3.5-3.5 1.5 1.5L16.5 12z"/>'
+        : '<path d="M4 9v6h4l5 5V4l-5 5H4z"/>';
+      musicPlayer.muted = isMuted;
+      gameFrame.muted = isMuted;
+    }
+    updateMute();
+
+    // Home button → splash then redirect
+    homeBtn.onclick = () => {
+      splash.classList.remove("fade-out");
+      nav.classList.remove("visible");
+      countdownEl.classList.remove("visible");
+      setTimeout(() => {
+        window.location.href = "https://camcookieg.github.io/CST/";
+      }, 1500);
+    };
+
+    // Countdown logic
+    function updateCountdown() {
+      const now = new Date();
+      const launchTime = new Date("2025-12-24T18:00:00-05:00"); // Santa leaves
+      const diff = launchTime - now;
+
+      if (diff > 0) {
+        const months = Math.floor(diff / (1000*60*60*24*30));
+        const days = Math.floor((diff / (1000*60*60*24)) % 30);
+        const hours = Math.floor((diff / (1000*60*60)) % 24);
+        const minutes = Math.floor((diff / (1000*60)) % 60);
+        countdownEl.textContent = `${months} months ${days} days ${hours} hours ${minutes} minutes`;
+      } else {
+        countdownEl.textContent = "Santa is on his way!";
+      }
+    }
+    setInterval(updateCountdown, 1000);
+    updateCountdown();
+  </script>
+</body>
+</html>
